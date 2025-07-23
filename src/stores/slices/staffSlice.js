@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axiosClient from '../../config/axios';
+import Cookies from 'js-cookie';
 
 export const staffLogin = createAsyncThunk(
     'staff/login',
@@ -17,11 +18,29 @@ export const staffLogout = createAsyncThunk(
     'staff/logout',
     async (_, { rejectWithValue }) => {
         try {
+            console.log('Attempting staff logout...');
+            console.log('Current cookies:', {
+                accessToken: Cookies.get('accessToken'),
+                username: Cookies.get('username'),
+                role: Cookies.get('role')
+            });
+            
             const response = await axiosClient.get('/web/logout');
+            console.log('Staff logout successful:', response);
             return response;
         } catch (error) {
-            console.error("API error:", error);
-            return rejectWithValue(error);
+            console.error("Staff logout API error:", error);
+            console.error("Error response:", error.response);
+            console.error("Error status:", error.response?.status);
+            console.error("Error data:", error.response?.data);
+            console.error("Error config:", error.config);
+            
+            // Return more detailed error information
+            return rejectWithValue({
+                message: error.response?.data?.message || error.message || 'Đăng xuất nhân viên thất bại',
+                status: error.response?.status,
+                error: error
+            });
         }
     }
 );
@@ -64,11 +83,11 @@ export const fetchPendingConfirmations = createAsyncThunk(
 
 export const confirmAppointment = createAsyncThunk(
     'staff/confirmAppointment',
-    async (appointmentId, { rejectWithValue }) => {
+    async ({ appointmentId, status }, { rejectWithValue }) => {
         try {
             const response = await axiosClient.put('/employee/action-order', {
                 orderId: appointmentId,
-                status: 1
+                status: status
             });
             return response;
         } catch (error) {

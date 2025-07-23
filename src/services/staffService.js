@@ -1,7 +1,9 @@
 import { useDispatch, useSelector } from 'react-redux';
-import { staffLogin, staffLogout, clearStaffError, fetchBookingStats, fetchHourlyAppointments, fetchPendingConfirmations, cancelAppointment, confirmAppointment } from '../stores/slices/staffSlice';
+import { staffLogin, staffLogout, clearStaffError, fetchBookingStats, fetchHourlyAppointments, fetchPendingConfirmations, cancelAppointment, confirmAppointment as confirmAppointmentThunk } from '../stores/slices/staffSlice';
+import { clearAuth } from '../stores/slices/authSlice';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
+import Cookies from 'js-cookie';
 
 const useStaffService = () => {
     const dispatch = useDispatch();
@@ -31,15 +33,50 @@ const useStaffService = () => {
             dispatch(clearStaffError());
             const resultAction = await dispatch(staffLogout());
 
+            // Đăng xuất authSlice luôn
+            dispatch(clearAuth());
+
             if (staffLogout.fulfilled.match(resultAction)) {
                 toast.success('Đăng xuất thành công');
-                window.location.reload();
+                navigate('/home');
                 return true;
             } else {
-                throw resultAction.payload;
+                // Handle specific error cases
+                const errorData = resultAction.payload;
+                
+                // If it's a 500 error, we'll still log the user out locally
+                if (errorData?.status === 500) {
+                    console.warn('Backend staff logout failed with 500 error, logging out locally');
+                    toast.warn('Đăng xuất khỏi máy chủ thất bại, nhưng đã đăng xuất khỏi ứng dụng');
+                    
+                    // Clear cookies
+                    Cookies.remove('accessToken');
+                    Cookies.remove('username');
+                    Cookies.remove('role');
+                    
+                    navigate('/home');
+                    return true;
+                }
+                
+                throw new Error(errorData?.message || 'Đăng xuất nhân viên thất bại');
             }
         } catch (error) {
-            throw new Error(error.message || 'Đăng xuất nhân viên thất bại');
+            console.error('Staff logout service error:', error);
+            
+            // Fallback: clear local state even if there's an error
+            try {
+                // Clear cookies
+                Cookies.remove('accessToken');
+                Cookies.remove('username');
+                Cookies.remove('role');
+                
+                toast.warn('Đã đăng xuất khỏi ứng dụng');
+                navigate('/home');
+                return true;
+            } catch (fallbackError) {
+                console.error('Fallback staff logout error:', fallbackError);
+                throw new Error(error.message || 'Đăng xuất nhân viên thất bại');
+            }
         }
     };
 
@@ -92,13 +129,16 @@ const useStaffService = () => {
         }
     };
 
-    const confirm = async (appointmentId) => {
+    // Bổ sung xác nhận hoàn thành
+    const confirmAppointment = async (appointmentId, isComplete = false) => {
         try {
             dispatch(clearStaffError());
-            const resultAction = await dispatch(confirmAppointment(appointmentId));
+            const status = isComplete ? 2 : 1;
+            const resultAction = await dispatch(
+                confirmAppointmentThunk({ appointmentId, status })
+            );
 
-            if (confirmAppointment.fulfilled.match(resultAction)) {
-                // Tự động refresh data sau khi thành công
+            if (confirmAppointmentThunk.fulfilled.match(resultAction)) {
                 getPendingConfirmations();
                 getStats();
                 return resultAction.payload;
@@ -136,7 +176,7 @@ const useStaffService = () => {
         getStats,
         getHourlyAppointments,
         getPendingConfirmations,
-        confirmAppointment: confirm,
+        confirmAppointment,
         cancelAppointment: cancel,
         staffSelector
     };
