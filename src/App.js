@@ -1,25 +1,21 @@
-import logo from './logo.svg';
-import './App.css';
+import React from "react";
+import { RouterProvider } from 'react-router-dom';
+import router from "./routers/routes";
+import { ToastContainer } from "react-toastify";
+import { AuthProvider } from './stores/context/AuthContext';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 
 function App() {
-  return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
-  );
+    return (
+        <GoogleOAuthProvider clientId="528064981157-fu7mkbnv65snsdenm00ecche49rf2tsh.apps.googleusercontent.com">
+            <div className="App">
+                <AuthProvider>
+                    <RouterProvider router={router} />
+                </AuthProvider>
+                <ToastContainer position="bottom-right" autoClose={3000} pauseOnHover={false} />
+            </div>
+        </GoogleOAuthProvider>
+    );
 }
 
 export default App;
